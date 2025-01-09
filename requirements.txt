@@ -1,0 +1,10 @@
+openai
+langchain
+pinecone-client
+pyautocad
+numpy
+pandas
+kittycad==0.7.4
+python-dotenv
+pygltflib
+pyvista
