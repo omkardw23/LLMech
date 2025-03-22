@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>LLMech - AI Mechanical Design Assistant</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #chat-container {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .user-message {
+            background-color: #e3f2fd;
+            margin-left: 20%;
+        }
+        .assistant-message {
+            background-color: #f5f5f5;
+            margin-right: 20%;
+        }
+        #input-container {
+            display: flex;
+            gap: 10px;
+        }
+        #user-input {
+            flex-grow: 1;
+            padding: 10px;
+        }
+        #upload-container {
+            margin-bottom: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .status-message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        #design-output {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            display: none;
+        }
+        
+        #cad-preview {
+            max-width: 100%;
+            margin-top: 15px;
+        }
+        
+        .json-view {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .error-message {
+            color: red;
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #ffebee;
+            border-radius: 4px;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 3px solid #3498db;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .generate-cad-btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 0;
+            font-size: 14px;
+            font-weight: bold;
+            display: block !important; /* Force display */
+        }
+        
+        .generate-cad-btn:hover {
+            background-color: #45a049;
+        }
+        
+        .message-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 10px 0;
+            width: 100%;
+        }
+        
+        .assistant-message {
+            background-color: #f5f5f5;
+            margin-right: 20%;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        
+        .user-message {
+            background-color: #e3f2fd;
+            margin-left: 20%;
+            padding: 15px;
+            border-radius: 5px;
+            align-self: flex-end;
+        }
+        
+        .header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        
+        .header p {
+            margin: 5px 0 0 0;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+    </style>
+    <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+</head>
+<body>
+    <div class="header">
+        <h1>LLMech</h1>
+        <p>AI Mechanical Design Assistant</p>
+    </div>
+    <div id="upload-container">
+        <input type="file" id="pdf-upload" accept=".pdf">
+        <button onclick="uploadPDF()">Upload PDF</button>
+    </div>
+    <div id="chat-container"></div>
+    <div id="input-container">
+        <input type="text" id="user-input" placeholder="Type your message...">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <div id="design-output">
+        <h3>Design Specifications</h3>
+        <div class="json-view" id="design-specs"></div>
+        
+        <h3>3D Model Viewer</h3>
+        <div id="model-status"></div>
+        <div id="model-viewer-container" style="height: 400px; width: 100%;">
+            <model-viewer id="model-viewer"
+                camera-controls
+                auto-rotate
+                shadow-intensity="1"
+                style="width: 100%; height: 100%;"
+                exposure="0.5"
+                environment-image="neutral">
+            </model-viewer>
+        </div>
+        
+        <div id="cad-model-container">
+            <a id="cad-download" href="" download style="display: none;">
+                Download CAD Model (STEP)
+            </a>
+        </div>
+    </div>
+
+    <div id="saved-models-container" style="margin-top: 20px;">
+        <h3>Saved CAD Models</h3>
+        <button onclick="refreshModelList()" class="generate-cad-btn" style="background-color: #2196F3;">
+            🔄 Refresh Models
+        </button>
+        <div id="model-list" style="margin-top: 10px;"></div>
+    </div>
+
+    <button id="generate-cad-btn" 
+            onclick="generateCADFromResponse()" 
+            class="generate-cad-btn" 
+            style="display: none;">
+        🔧 Generate CAD Model
+    </button>
+
+    <script>
+        let lastCADResponse = ''; // Store the CAD-focused response
+
+        function addMessage(content, isUser) {
+            const chatContainer = document.getElementById('chat-container');
+            const messageContainer = document.createElement('div');
+            messageContainer.className = 'message-container';
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'assistant-message'}`;
+            messageDiv.textContent = content;
+            messageContainer.appendChild(messageDiv);
+            
+            if (!isUser) {
+                console.log("Adding CAD button"); // Debug log
+                const generateButton = document.createElement('button');
+                generateButton.className = 'generate-cad-btn';
+                generateButton.textContent = '🔧 Generate CAD Model';
+                generateButton.onclick = () => {
+                    console.log("Generate CAD button clicked"); // Debug log
+                    generateCADFromMessage(content);
+                };
+                messageContainer.appendChild(generateButton);
+            }
+            
+            chatContainer.appendChild(messageContainer);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function showLoading(message) {
+            const status = document.getElementById('model-status');
+            status.innerHTML = `
+                <div class="loading"></div>
+                <span style="margin-left: 10px">${message}</span>
+            `;
+        }
+
+        function showError(message) {
+            const status = document.getElementById('model-status');
+            status.innerHTML = `<div class="error-message">${message}</div>`;
+        }
+
+        function displayDesign(design, cadModelUrl, gltfData) {
+            const designOutput = document.getElementById('design-output');
+            const designSpecs = document.getElementById('design-specs');
+            const cadDownload = document.getElementById('cad-download');
+            const modelViewer = document.getElementById('model-viewer');
+            const status = document.getElementById('model-status');
+            
+            designOutput.style.display = 'block';
+            designSpecs.textContent = JSON.stringify(design, null, 2);
+            
+            if (cadModelUrl) {
+                cadDownload.href = cadModelUrl;
+                cadDownload.style.display = 'block';
+                
+                if (gltfData) {
+                    try {
+                        const blob = new Blob([base64ToArrayBuffer(gltfData)], {type: 'model/gltf+json'});
+                        const url = URL.createObjectURL(blob);
+                        modelViewer.src = url;
+                        status.innerHTML = '';
+                    } catch (error) {
+                        showError('Error loading 3D model: ' + error.message);
+                    }
+                } else {
+                    showError('3D visualization data not available');
+                }
+            } else {
+                showError('CAD model generation failed');
+                cadDownload.style.display = 'none';
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('user-input');
+            const message = input.value.trim();
+            if (!message) return;
+
+            addMessage(message, true);
+            input.value = '';
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message })
+                });
+
+                const data = await response.json();
+                if (data.error) {
+                    addMessage('Error: ' + data.error, false);
+                } else {
+                    // Display detailed response to user
+                    addMessage(data.response, false);
+                    // Store CAD response and log it
+                    lastCADResponse = data.cad_response;
+                    console.log('CAD-focused response:', lastCADResponse);
+                    // Show the generate CAD button
+                    document.getElementById('generate-cad-btn').style.display = 'block';
+                }
+            } catch (error) {
+                addMessage('Error: Failed to get response', false);
+            }
+        }
+
+        // Allow Enter key to send message
+        document.getElementById('user-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        async function uploadPDF() {
+            const fileInput = document.getElementById('pdf-upload');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a file first');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addStatusMessage('File uploaded and processed successfully!', 'success');
+                } else {
+                    addStatusMessage('Error: ' + data.error, 'error');
+                }
+            } catch (error) {
+                addStatusMessage('Error uploading file: ' + error, 'error');
+            }
+        }
+
+        function addStatusMessage(message, type) {
+            const chatContainer = document.getElementById('chat-container');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `status-message ${type}`;
+            messageDiv.textContent = message;
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function base64ToArrayBuffer(base64) {
+            const binaryString = window.atob(base64);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        function generateCADFromMessage(messageText) {
+            console.log("Generating CAD from message:", messageText); // Debug log
+            showLoading('Generating CAD model...');
+            
+            fetch('/generate-cad', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ design_text: messageText })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log("CAD generation response:", data); // Debug log
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    displayDesign(data.design, data.cad_model_url, data.gltf_data);
+                }
+            })
+            .catch(error => {
+                console.error("CAD generation error:", error); // Debug log
+                showError('Failed to generate CAD model: ' + error.message);
+            });
+        }
+
+        async function refreshModelList() {
+            try {
+                const response = await fetch('/list-models');
+                const data = await response.json();
+                
+                const modelList = document.getElementById('model-list');
+                modelList.innerHTML = '';
+                
+                data.models.forEach(model => {
+                    const modelDiv = document.createElement('div');
+                    modelDiv.style.padding = '10px';
+                    modelDiv.style.margin = '5px 0';
+                    modelDiv.style.backgroundColor = '#f5f5f5';
+                    modelDiv.style.borderRadius = '4px';
+                    
+                    modelDiv.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span>${model.name}</span>
+                            <button onclick="loadModel('${model.name}')" 
+                                    class="generate-cad-btn" 
+                                    style="margin: 0; padding: 5px 10px;">
+                                👁️ View Model
+                            </button>
+                        </div>
+                    `;
+                    
+                    modelList.appendChild(modelDiv);
+                });
+            } catch (error) {
+                console.error('Error loading model list:', error);
+            }
+        }
+
+        async function loadModel(modelName) {
+            showLoading('Loading CAD model...');
+            
+            try {
+                const response = await fetch(`/load-model/${modelName}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    displayDesign(data.design, null, data.gltf_data);
+                }
+            } catch (error) {
+                showError('Failed to load model: ' + error.message);
+            }
+        }
+
+        async function generateCADFromResponse() {
+            if (!lastCADResponse) {
+                showError('No design response available. Please ask for a design first.');
+                return;
+            }
+
+            console.log('Sending to KittyCAD:', lastCADResponse);
+            showLoading('Generating CAD model...');
+            
+            try {
+                const response = await fetch('/generate-cad', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ cad_response: lastCADResponse })
+                });
+
+                const data = await response.json();
+                if (data.error) {
+                    console.error('KittyCAD error:', data.error);
+                    showError(data.error);
+                } else {
+                    console.log('KittyCAD success:', data);
+                    displayDesign(data.gltf_path);
+                }
+            } catch (error) {
+                console.error('KittyCAD request failed:', error);
+                showError('Failed to generate CAD model: ' + error.message);
+            }
+        }
+
+        // Call refreshModelList when the page loads
+        document.addEventListener('DOMContentLoaded', refreshModelList);
+    </script>
+</body>
+</html> 

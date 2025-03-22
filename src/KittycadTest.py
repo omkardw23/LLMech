@@ -26,7 +26,7 @@ response = create_text_to_cad.sync(
     client=client,
     output_format=FileExportFormat.STEP,
     body=TextToCadCreateBody(
-        prompt="Create a helical gear pair for parallel shafts: Gear 1: 30 teeth, module 2 mm, helix angle 15°. Gear 2: 60 teeth, module 2 mm, helix angle 15°. Align the gears for a center distance of 100 mm.",
+        prompt="Design a ceiling fan with a cylindrical motor housing measuring 200 mm in diameter and 100 mm in height. The housing should include a top hole for attaching a suspension rod and a flat bottom with four evenly spaced mounting points for the blades. Each blade should be 500 mm long, 50 mm wide, and 3 mm thick, made of lightweight aluminum. The suspension rod should be 300 mm long and 20 mm in diameter, made of steel, with threaded ends for secure attachment. At the top, a circular ceiling mount, 100 mm in diameter, should include three screw holes for installation and a ball joint for slight angle adjustments. To assemble, attach the suspension rod to the motor housing at the top hole and fix the ceiling mount to the rod's upper end. Mount the four blades to the motor housing’s bottom using screws, ensuring even spacing. Check for proper alignment and balance.",
     ),
 )
 

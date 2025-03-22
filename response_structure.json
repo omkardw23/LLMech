@@ -1,0 +1,20 @@
+
+{
+    "components": {
+        "motor housing": {
+            "diameter": "200 mm",
+            "height": "100 mm"
+        },
+        "aluminum blades": {
+            "length": "500 mm",
+            "quantity": 4
+        },
+        "steel suspension rod": {
+            "length": "300 mm"
+        },
+        "ceiling mount": {
+            "height": "100 mm"
+        }
+    },
+    "assemble": "1. Secure the four aluminum blades to the motor housing, ensuring even spacing and balance. 2. Attach the steel suspension rod to the top of the motor housing. 3. Connect the other end of the suspension rod to the ceiling mount. 4. Ensure the entire assembly is balanced and properly aligned before finalizing the installation."
+}
